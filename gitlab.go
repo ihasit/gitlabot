@@ -275,7 +275,8 @@ func TransmitRobot(ctx *gin.Context) {
 		}
 		content = "# " + pushBody.Repository.Name + "\n"
 		content += "### On branch `" + pushBody.Ref + "`\n"
-		for _, v := range pushBody.Commits {
+		if len(pushBody.Commits) > 0 {
+			v := pushBody.Commits[len(pushBody.Commits)-1]
 			content += fmt.Sprintf("%s push a commit [%s](%s)  %s", v.Author.Name, strings.ReplaceAll(v.Message, "\n", ""), v.Url, v.TimeStamp) + "\n"
 		}
 		if pushBody.After == "0000000000000000000000000000000000000000" {
@@ -288,8 +289,9 @@ func TransmitRobot(ctx *gin.Context) {
 		}
 		content = "# " + tagPushBody.Repository.Name + "\n"
 		content += fmt.Sprintf("%s push a tag: [%s](%s)\n", tagPushBody.UserName, tagPushBody.Ref, tagPushBody.Repository.HomePage+strings.Replace(tagPushBody.Ref, "refs/tags/", "tags/", -1))
-		for _, commit := range tagPushBody.Commits {
-			content += fmt.Sprintf("Commit: [%s](%s) by %s\n", commit.Id, commit.Url, commit.Author.Name)
+		if len(tagPushBody.Commits) > 0 {
+			commit := tagPushBody.Commits[len(tagPushBody.Commits)-1]
+			content += fmt.Sprintf("Last Commit: [%s](%s) by %s\n", commit.Id, commit.Url, commit.Author.Name)
 		}
 	} else if pushEvent == "Issue Hook" {
 		issueBody := &IssuePushBody{}
