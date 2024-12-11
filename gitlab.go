@@ -113,9 +113,14 @@ type PushBody struct {
 
 // TagPushBody Tag events
 type TagPushBody struct {
-	UserName   string     `json:"user_name"`
+	ObjectKind string     `json:"object_kind"`
+	EventName  string     `json:"event_name"`
+	Before     string     `json:"before"`
+	After      string     `json:"after"`
 	Ref        string     `json:"ref"`
+	Commits    []Commit   `json:"commits"`
 	Repository Repository `json:"repository"`
+	UserName   string     `json:"user_name"`
 }
 
 // IssuePushBody Issues events
@@ -209,6 +214,29 @@ type Project struct {
 	GitSSHUrl string `json:"git_ssh_url"`
 }
 
+// ReleaseBody Release events
+type ReleaseBody struct {
+	ObjectKind string     `json:"object_kind"`
+	Name       string     `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt  string     `json:"created_at"`
+	Url        string     `json:"url"`
+	Assets     Assets     `json:"assets"`
+	Project    Project    `json:"project"`
+}
+
+type Assets struct {
+	Count int      `json:"count"`
+	Links []Link   `json:"links"`
+}
+
+type Link struct {
+	Id       int    `json:"id"`
+	LinkType string `json:"link_type"`
+	Name     string `json:"name"`
+	Url      string `json:"url"`
+}
+
 func bindJson(ctx *gin.Context, m interface{}) error {
 	err := ctx.BindJSON(m)
 	if err != nil {
@@ -259,7 +287,10 @@ func TransmitRobot(ctx *gin.Context) {
 			return
 		}
 		content = "# " + tagPushBody.Repository.Name + "\n"
-		content += fmt.Sprintf("%s push a tag: [%s](%s)", tagPushBody.UserName, tagPushBody.Ref, tagPushBody.Repository.HomePage+strings.Replace(tagPushBody.Ref, "refs", "", -1))
+		content += fmt.Sprintf("%s push a tag: [%s](%s)\n", tagPushBody.UserName, tagPushBody.Ref, tagPushBody.Repository.HomePage+strings.Replace(tagPushBody.Ref, "refs/tags/", "tags/", -1))
+		for _, commit := range tagPushBody.Commits {
+			content += fmt.Sprintf("Commit: [%s](%s) by %s\n", commit.Id, commit.Url, commit.Author.Name)
+		}
 	} else if pushEvent == "Issue Hook" {
 		issueBody := &IssuePushBody{}
 		if err := bindJson(ctx, issueBody); err != nil {
@@ -313,6 +344,19 @@ func TransmitRobot(ctx *gin.Context) {
 		}
 		if pipelineBody.ObjectAttributes.Duration > 0 {
 			content += fmt.Sprintf("`Duration`: %ds", pipelineBody.ObjectAttributes.Duration)
+		}
+	} else if pushEvent == "Release Hook" {
+		releaseBody := &ReleaseBody{}
+		if err := bindJson(ctx, releaseBody); err != nil {
+			return
+		}
+		content = "# " + releaseBody.Project.Name + "\n"
+		content += fmt.Sprintf("Release: **%s**\n", releaseBody.Name)
+		content += fmt.Sprintf("Description: %s\n", releaseBody.Description)
+		content += fmt.Sprintf("Created at: %s\n", releaseBody.CreatedAt)
+		content += fmt.Sprintf("URL: [Release Link](%s)\n", releaseBody.Url)
+		for _, link := range releaseBody.Assets.Links {
+			content += fmt.Sprintf("Asset: [%s](%s)\n", link.Name, link.Url)
 		}
 	}
 	if len(content) == 0 {
